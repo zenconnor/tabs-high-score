@@ -1,0 +1,9 @@
+name = "tabs-high-score"
+compatibility_date = "2026-07-01"
+pages_build_output_dir = "public"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "tabs-high-score"
+# Replace with the id printed by: npx wrangler d1 create tabs-high-score
+database_id = "7607a981-5f01-4e1d-a7da-3903106d9470"

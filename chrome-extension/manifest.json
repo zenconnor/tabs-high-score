@@ -1,0 +1,11 @@
+{
+  "manifest_version": 3,
+  "name": "Tabs High Score Counter",
+  "version": "1.0.0",
+  "description": "Counts how many tabs you have open so tabshighscore.com can verify your score. Sees only the count, never your URLs.",
+  "icons": { "128": "icon128.png" },
+  "background": { "service_worker": "background.js" },
+  "externally_connectable": {
+    "matches": ["https://tabshighscore.com/*"]
+  }
+}

@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tabs High Score</title>
+<meta name="description" content="How many browser tabs do you have open? Post your verified score.">
+<style>
+  :root { color-scheme: light dark; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0 auto; padding: 1.5rem 1rem 3rem; max-width: 34rem;
+    font-family: system-ui, sans-serif; line-height: 1.5;
+  }
+  h1 { text-align: center; margin: 0.5rem 0 0; font-size: 2rem; }
+  .tagline { text-align: center; margin-top: 0.25rem; opacity: 0.7; }
+  .card {
+    border: 1px solid color-mix(in srgb, currentColor 25%, transparent);
+    border-radius: 12px; padding: 1rem 1.25rem; margin-top: 1.25rem;
+  }
+  .card h2 { margin: 0 0 0.5rem; font-size: 1.1rem; }
+  button {
+    font: inherit; padding: 0.5rem 1rem; border-radius: 8px; cursor: pointer;
+    border: 1px solid color-mix(in srgb, currentColor 35%, transparent);
+    background: color-mix(in srgb, currentColor 8%, transparent); color: inherit;
+  }
+  button.primary { background: #2563eb; border-color: #2563eb; color: #fff; }
+  input {
+    font: inherit; padding: 0.5rem; border-radius: 8px; color: inherit;
+    border: 1px solid color-mix(in srgb, currentColor 35%, transparent);
+    background: transparent; width: 100%;
+  }
+  form { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.75rem; }
+  form > label { flex: 1 1 10rem; }
+  form > button { flex: 1 1 100%; }
+  label span { display: block; font-size: 0.85rem; opacity: 0.75; }
+  #install {
+    margin-top: 0.75rem; padding: 0.75rem 1rem; border-radius: 8px;
+    background: color-mix(in srgb, currentColor 8%, transparent);
+    font-size: 0.9rem;
+  }
+  #install p { margin: 0.6rem 0 0; }
+  #install details { margin-top: 0.6rem; font-size: 0.85rem; }
+  #ext-status { margin: 0 0 0.25rem; font-size: 0.9rem; color: #16a34a; }
+  a.button {
+    display: inline-block; padding: 0.5rem 1rem; border-radius: 8px;
+    background: #2563eb; color: #fff; text-decoration: none; font-weight: 600;
+  }
+  code {
+    font-size: 0.85em; padding: 0.1em 0.3em; border-radius: 4px;
+    background: color-mix(in srgb, currentColor 10%, transparent);
+    overflow-wrap: anywhere;
+  }
+  .hidden { display: none; }
+  #status { margin: 0.5rem 0 0; min-height: 1.5em; }
+  #status.error { color: #dc2626; }
+  #status.ok { color: #16a34a; }
+  .windows { display: flex; gap: 0.5rem; margin-bottom: 0.75rem; }
+  .windows button[aria-pressed="true"] { background: #2563eb; border-color: #2563eb; color: #fff; }
+  .board-scroll { max-height: 24rem; overflow-y: auto; }
+  ol.board { margin: 0; padding-left: 2.4rem; }
+  ol.board li { padding: 0.15rem 0; }
+  ol.board .tabs { float: right; font-variant-numeric: tabular-nums; font-weight: 600; }
+  .empty { opacity: 0.6; font-style: italic; }
+  footer { text-align: center; font-size: 0.8rem; opacity: 0.6; margin-top: 2rem; }
+</style>
+</head>
+<body>
+<h1>&#128194; Tabs High Score</h1>
+<p class="tagline">How many tabs are you keeping alive right now?</p>
+
+<div class="card">
+  <h2>Post your score</h2>
+  <p id="ext-status" class="hidden"></p>
+  <form id="submit-form">
+    <label>Name<span>1&ndash;24 characters</span>
+      <input id="name" name="name" maxlength="24" required autocomplete="nickname">
+    </label>
+    <button id="submit-btn" class="primary" type="submit">Submit score</button>
+  </form>
+  <div id="install" class="hidden">
+    <strong>No hand-typed scores here</strong> &mdash; your tab count is
+    measured by the free companion extension. It sees how <em>many</em> tabs
+    you have, never what's in them.
+    <p><a class="button" href="https://chromewebstore.google.com/detail/leocilaibnaamcbhnmilhfhbkhejnlil">Add to Chrome &rarr;</a></p>
+    <p>Installed? Refresh this page. Desktop Chrome only &mdash; that's where
+    the tabs live anyway.</p>
+    <details>
+      <summary>For developers</summary>
+      Load the <code>chrome-extension</code> folder from
+      <a href="https://github.com/zenconnor/tabs-high-score">the project repo</a>
+      unpacked via <code>chrome://extensions</code>, then point this page at
+      your copy: <code>localStorage.tabsExtId = '&lt;its id&gt;'</code> and
+      refresh.
+    </details>
+  </div>
+  <p id="status"></p>
+</div>
+
+<div class="card">
+  <h2>&#127942; Leaderboard <span style="font-weight:normal;font-size:0.8rem;opacity:0.7">top 100, refreshes about once a minute</span></h2>
+  <div class="windows" role="group" aria-label="Time window">
+    <button type="button" data-window="hour" aria-pressed="true">Past hour</button>
+    <button type="button" data-window="day" aria-pressed="false">Past 24h</button>
+    <button type="button" data-window="all" aria-pressed="false">All time</button>
+  </div>
+  <div class="board-scroll">
+    <ol class="board" id="board"></ol>
+  </div>
+  <p class="empty hidden" id="board-empty">No scores yet &mdash; be the first.</p>
+</div>
+
+<footer>No cookie, no glory: submissions without a browser cookie are dropped.
+And no hand-typed scores: the extension counts your actual tabs.
+<br><a href="/privacy">Privacy policy</a></footer>
+
+<script>
+'use strict';
+const $ = (id) => document.getElementById(id);
+
+// A random per-browser ID. The submit API drops scores without it (decision-1.md).
+if (!/(?:^|;\s*)tabid=/.test(document.cookie)) {
+  document.cookie = 'tabid=' + crypto.randomUUID() + '; max-age=31536000; path=/; samesite=lax';
+}
+
+// The extension exposes a messaging endpoint to this site only
+// (externally_connectable in its manifest): Chrome provides
+// chrome.runtime.sendMessage on pages an installed extension declares, so
+// "absent or silent" means "not installed" (decision-6.md). For testing an
+// unpacked copy, set localStorage.tabsExtId to its machine-specific id.
+const EXT_ID = localStorage.tabsExtId || 'leocilaibnaamcbhnmilhfhbkhejnlil';
+
+function countTabs() {
+  return new Promise((resolve) => {
+    if (!window.chrome?.runtime?.sendMessage) return resolve(null);
+    let timer;
+    const finish = (v) => { clearTimeout(timer); resolve(v); };
+    timer = setTimeout(() => finish(null), 1500);
+    try {
+      chrome.runtime.sendMessage(EXT_ID, { type: 'count-tabs' }, (res) => {
+        finish(!chrome.runtime.lastError && Number.isInteger(res?.tabs) ? res.tabs : null);
+      });
+    } catch {
+      finish(null);
+    }
+  });
+}
+
+$('submit-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const status = $('status');
+
+  status.className = '';
+  status.textContent = 'Counting your tabs…';
+  const tabs = await countTabs();
+  if (tabs === null) {
+    $('install').classList.remove('hidden');
+    status.className = 'error';
+    status.textContent = 'Tab-counting extension not detected — install it below, then refresh and try again.';
+    return;
+  }
+  $('install').classList.add('hidden');
+
+  status.textContent = 'Verified ' + tabs.toLocaleString() + ' open tab' + (tabs === 1 ? '' : 's') + ' — posting…';
+  try {
+    const res = await fetch('/api/submit', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ name: $('name').value, tabs }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Something went wrong.');
+    status.className = 'ok';
+    status.textContent = 'Score posted: ' + tabs.toLocaleString() + ' tabs! It will show on the board within a minute or so.';
+    refresh();
+  } catch (err) {
+    status.className = 'error';
+    status.textContent = err.message;
+  }
+});
+
+// Leaderboard: poll every 60 s; responses are cached at the edge for 60 s
+// (decision-5.md), so a refresh is cheap and the board is ~a minute fresh.
+let boards = { hour: [], day: [], all: [] };
+let currentWindow = 'hour';
+
+function render() {
+  const rows = boards[currentWindow] || [];
+  $('board').replaceChildren(...rows.map((r) => {
+    const li = document.createElement('li');
+    const name = document.createElement('span');
+    name.textContent = r.name;
+    const tabs = document.createElement('span');
+    tabs.className = 'tabs';
+    tabs.textContent = r.tabs.toLocaleString();
+    li.append(tabs, name);
+    return li;
+  }));
+  $('board-empty').classList.toggle('hidden', rows.length > 0);
+}
+
+async function refresh() {
+  try {
+    const res = await fetch('/api/leaderboard');
+    if (!res.ok) return;
+    boards = await res.json();
+    render();
+  } catch { /* transient network error; next poll retries */ }
+}
+
+for (const btn of document.querySelectorAll('.windows button')) {
+  btn.addEventListener('click', () => {
+    currentWindow = btn.dataset.window;
+    for (const b of document.querySelectorAll('.windows button')) {
+      b.setAttribute('aria-pressed', String(b === btn));
+    }
+    render();
+  });
+}
+
+// Proactive detection: check at load, and while absent re-check every 5 s so
+// the page flips to "connected" after an install (some installs still need a
+// refresh — the banner says so — but when Chrome exposes the API to already
+// open pages, this catches it without one).
+async function checkExtension() {
+  const tabs = await countTabs();
+  const connected = tabs !== null;
+  $('install').classList.toggle('hidden', connected);
+  $('ext-status').classList.toggle('hidden', !connected);
+  if (connected) {
+    $('ext-status').textContent = '✓ Tab counter connected — ' + tabs.toLocaleString() +
+      ' tab' + (tabs === 1 ? '' : 's') + ' and counting.';
+  }
+  return connected;
+}
+
+(async () => {
+  if (await checkExtension()) return;
+  const extPoll = setInterval(async () => {
+    if (await checkExtension()) clearInterval(extPoll);
+  }, 5000);
+})();
+
+refresh();
+setInterval(refresh, 60000);
+</script>
+</body>
+</html>
