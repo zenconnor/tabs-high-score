@@ -130,18 +130,42 @@ if (!/(?:^|;\s*)tabid=/.test(document.cookie)) {
 // unpacked copy, set localStorage.tabsExtId to its machine-specific id.
 const EXT_ID = localStorage.tabsExtId || 'leocilaibnaamcbhnmilhfhbkhejnlil';
 
-function countTabs() {
+// Detection: silent, count-free. Reading the count on load would defeat the
+// point of the Share/Deny dialog, so detection just asks "are you there?".
+function pingExtension() {
   return new Promise((resolve) => {
-    if (!window.chrome?.runtime?.sendMessage) return resolve(null);
-    let timer;
-    const finish = (v) => { clearTimeout(timer); resolve(v); };
-    timer = setTimeout(() => finish(null), 1500);
+    if (!window.chrome?.runtime?.sendMessage) return resolve(false);
+    let done = false;
+    const finish = (v) => { if (done) return; done = true; clearTimeout(timer); resolve(v); };
+    const timer = setTimeout(() => finish(false), 1500);
     try {
-      chrome.runtime.sendMessage(EXT_ID, { type: 'count-tabs' }, (res) => {
-        finish(!chrome.runtime.lastError && Number.isInteger(res?.tabs) ? res.tabs : null);
+      chrome.runtime.sendMessage(EXT_ID, { type: 'ping' }, (res) => {
+        finish(!chrome.runtime.lastError && res?.installed === true);
       });
     } catch {
-      finish(null);
+      finish(false);
+    }
+  });
+}
+
+// The real count request: opens the extension's Share/Deny window, so it can
+// take as long as the user does. Resolves { status, tabs? } — status is one of
+// ok | denied | timeout | not-installed.
+function requestCount() {
+  return new Promise((resolve) => {
+    if (!window.chrome?.runtime?.sendMessage) return resolve({ status: 'not-installed' });
+    let done = false;
+    const finish = (v) => { if (done) return; done = true; clearTimeout(timer); resolve(v); };
+    const timer = setTimeout(() => finish({ status: 'timeout' }), 45000);
+    try {
+      chrome.runtime.sendMessage(EXT_ID, { type: 'count-tabs' }, (res) => {
+        if (chrome.runtime.lastError) return finish({ status: 'not-installed' });
+        if (res?.denied) return finish({ status: 'denied' });
+        if (Number.isInteger(res?.tabs)) return finish({ status: 'ok', tabs: res.tabs });
+        finish({ status: 'timeout' });
+      });
+    } catch {
+      finish({ status: 'not-installed' });
     }
   });
 }
@@ -151,17 +175,29 @@ $('submit-form').addEventListener('submit', async (e) => {
   const status = $('status');
 
   status.className = '';
-  status.textContent = 'Counting your tabs…';
-  const tabs = await countTabs();
-  if (tabs === null) {
+  status.textContent = 'Approve the request in the extension popup…';
+  const result = await requestCount();
+
+  if (result.status === 'not-installed') {
     $('install').classList.remove('hidden');
     status.className = 'error';
     status.textContent = 'Tab-counting extension not detected — install it below, then refresh and try again.';
     return;
   }
-  $('install').classList.add('hidden');
+  if (result.status === 'denied') {
+    status.className = 'error';
+    status.textContent = 'You declined to share your tab count. Hit Submit again when you’re ready.';
+    return;
+  }
+  if (result.status === 'timeout') {
+    status.className = 'error';
+    status.textContent = 'No response from the extension — hit Submit to try again.';
+    return;
+  }
 
-  status.textContent = 'Verified ' + tabs.toLocaleString() + ' open tab' + (tabs === 1 ? '' : 's') + ' — posting…';
+  const tabs = result.tabs;
+  $('install').classList.add('hidden');
+  status.textContent = 'Shared ' + tabs.toLocaleString() + ' open tab' + (tabs === 1 ? '' : 's') + ' — posting…';
   try {
     const res = await fetch('/api/submit', {
       method: 'POST',
@@ -223,13 +259,11 @@ for (const btn of document.querySelectorAll('.windows button')) {
 // refresh — the banner says so — but when Chrome exposes the API to already
 // open pages, this catches it without one).
 async function checkExtension() {
-  const tabs = await countTabs();
-  const connected = tabs !== null;
+  const connected = await pingExtension();
   $('install').classList.toggle('hidden', connected);
   $('ext-status').classList.toggle('hidden', !connected);
   if (connected) {
-    $('ext-status').textContent = '✓ Tab counter connected — ' + tabs.toLocaleString() +
-      ' tab' + (tabs === 1 ? '' : 's') + ' and counting.';
+    $('ext-status').textContent = '✓ Tab counter connected — hit Submit and approve the popup.';
   }
   return connected;
 }

@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Share tab count?</title>
+<style>
+  :root { color-scheme: light dark; }
+  body {
+    margin: 0; padding: 1rem 1.25rem;
+    font-family: system-ui, sans-serif; line-height: 1.4;
+  }
+  h1 { font-size: 1rem; margin: 0 0 0.5rem; }
+  .site { font-weight: 600; }
+  p { margin: 0 0 1rem; }
+  .count { font-weight: 600; font-variant-numeric: tabular-nums; }
+  .row { display: flex; gap: 0.5rem; }
+  button {
+    font: inherit; flex: 1; padding: 0.5rem; border-radius: 8px; cursor: pointer;
+    border: 1px solid color-mix(in srgb, currentColor 35%, transparent);
+    background: color-mix(in srgb, currentColor 8%, transparent); color: inherit;
+  }
+  button.primary { background: #2563eb; border-color: #2563eb; color: #fff; }
+</style>
+</head>
+<body>
+<h1><span class="site">tabshighscore.com</span> wants your tab count</h1>
+<p>Share that you have <span class="count" id="count">…</span> open? It sees the
+number only, never your tabs.</p>
+<div class="row">
+  <button class="primary" id="share">Share</button>
+  <button id="deny">Deny</button>
+</div>
+<script src="confirm.js"></script>
+</body>
+</html>
