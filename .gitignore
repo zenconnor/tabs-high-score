@@ -2,3 +2,7 @@
 node_modules/
 PLAN.md
 decision-*.md
+
+# Claude Code: keep shared launch.json tracked, ignore local/volatile state
+.claude/settings.local.json
+.claude/worktrees/
