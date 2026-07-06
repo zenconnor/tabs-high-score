@@ -57,3 +57,27 @@ npx wrangler pages dev --d1 DB=7607a981-5f01-4e1d-a7da-3903106d9470
 ```sh
 node --test
 ```
+
+## Abuse protection
+
+The write endpoint (`/api/submit`) is the only path that touches the database,
+so it has three layers:
+
+1. **Rate limiting** — a Cloudflare rate-limiting rule on `POST /api/submit`
+   (configured in the dashboard) caps requests per IP at the edge, before the
+   Function or D1 is reached.
+2. **Origin check** — `submit.js` rejects any POST whose `Origin` isn't the
+   site (browsers always send it on a fetch; lazy `curl` doesn't). A speed
+   bump, not a wall — it's spoofable.
+3. **Turnstile** — Cloudflare's bot check, **off until you configure it**:
+   - Create a Turnstile widget in the Cloudflare dashboard.
+   - Paste its **site key** into `TURNSTILE_SITE_KEY` in `public/index.html`.
+   - Set its **secret key** as a Pages env var `TURNSTILE_SECRET`.
+   With neither set, the widget isn't rendered and the server skips the check,
+   so submits work exactly as before. Set both together to turn it on.
+
+## License
+
+[AGPL-3.0](LICENSE). Because it's a network service, the AGPL's §13 applies:
+users interacting with the deployed site are offered its source — the page
+footer links to this repository.

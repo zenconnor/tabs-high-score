@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Tabs High Score</title>
 <meta name="description" content="How many browser tabs do you have open? Post your verified score.">
+<script src="https://challenges.cloudflare.com/turnstile/v0/api.js?onload=onTurnstileLoad&render=explicit" async defer></script>
 <style>
   :root { color-scheme: light dark; }
   * { box-sizing: border-box; }
@@ -77,6 +78,7 @@
       <input id="name" name="name" maxlength="24" required autocomplete="nickname">
     </label>
     <button id="submit-btn" class="primary" type="submit">Submit score</button>
+    <div id="ts-widget"></div>
   </form>
   <div id="install" class="hidden">
     <strong>No hand-typed scores here</strong> &mdash; your tab count is
@@ -112,7 +114,8 @@
 
 <footer>No cookie, no glory: submissions without a browser cookie are dropped.
 And no hand-typed scores: the extension counts your actual tabs.
-<br><a href="/privacy">Privacy policy</a></footer>
+<br><a href="/privacy">Privacy policy</a> &middot;
+<a href="https://github.com/zenconnor/tabs-high-score">Source (AGPL-3.0)</a></footer>
 
 <script>
 'use strict';
@@ -129,6 +132,37 @@ if (!/(?:^|;\s*)tabid=/.test(document.cookie)) {
 // "absent or silent" means "not installed" (decision-6.md). For testing an
 // unpacked copy, set localStorage.tabsExtId to its machine-specific id.
 const EXT_ID = localStorage.tabsExtId || 'leocilaibnaamcbhnmilhfhbkhejnlil';
+
+// Turnstile (bot check) is dormant until you paste a real site key here and set
+// the matching TURNSTILE_SECRET on the Pages project. Until then the widget
+// isn't rendered and no token is sent — the server skips verification to match.
+const TURNSTILE_SITE_KEY = 'REPLACE_WITH_TURNSTILE_SITE_KEY';
+const turnstileEnabled = () => TURNSTILE_SITE_KEY !== 'REPLACE_WITH_TURNSTILE_SITE_KEY';
+let tsWidgetId = null;
+
+// Called by the Turnstile script once it loads (explicit render mode).
+window.onTurnstileLoad = () => {
+  if (!turnstileEnabled() || !window.turnstile) return;
+  tsWidgetId = window.turnstile.render('#ts-widget', {
+    sitekey: TURNSTILE_SITE_KEY,
+    appearance: 'interaction-only', // invisible unless a challenge is needed
+  });
+};
+
+// Resolves the current token, waiting briefly for the managed widget to solve.
+// Empty string when dormant (server skips) or on failure.
+function turnstileToken() {
+  return new Promise((resolve) => {
+    if (!turnstileEnabled() || tsWidgetId === null) return resolve('');
+    const started = Date.now();
+    (function poll() {
+      const t = window.turnstile.getResponse(tsWidgetId);
+      if (t) return resolve(t);
+      if (Date.now() - started > 5000) return resolve('');
+      setTimeout(poll, 150);
+    })();
+  });
+}
 
 function countTabs() {
   return new Promise((resolve) => {
@@ -163,15 +197,17 @@ $('submit-form').addEventListener('submit', async (e) => {
 
   status.textContent = 'Verified ' + tabs.toLocaleString() + ' open tab' + (tabs === 1 ? '' : 's') + ' — posting…';
   try {
+    const token = await turnstileToken();
     const res = await fetch('/api/submit', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ name: $('name').value, tabs }),
+      body: JSON.stringify({ name: $('name').value, tabs, token }),
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Something went wrong.');
     status.className = 'ok';
     status.textContent = 'Score posted: ' + tabs.toLocaleString() + ' tabs! It will show on the board within a minute or so.';
+    if (turnstileEnabled() && tsWidgetId !== null) window.turnstile.reset(tsWidgetId); // fresh single-use token next time
     refresh();
   } catch (err) {
     status.className = 'error';

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { validateName, validateTabs, isUuid, getCookie } from '../lib/validate.js';
+import { validateName, validateTabs, isUuid, getCookie, isAllowedOrigin } from '../lib/validate.js';
 
 test('validateName trims and returns a valid name', () => {
   assert.equal(validateName('  Alex  '), 'Alex');
@@ -71,4 +71,28 @@ test('getCookie returns null when absent or header missing', () => {
 test('getCookie does not match cookies whose name merely ends with the target', () => {
   assert.equal(getCookie('xtabid=evil', 'tabid'), null);
   assert.equal(getCookie('xtabid=evil; tabid=good', 'tabid'), 'good');
+});
+
+test('isAllowedOrigin accepts the canonical site hosts', () => {
+  assert.equal(isAllowedOrigin('https://tabshighscore.com'), true);
+  assert.equal(isAllowedOrigin('https://www.tabshighscore.com'), true);
+});
+
+test('isAllowedOrigin accepts localhost dev origins on any port', () => {
+  assert.equal(isAllowedOrigin('http://localhost:8788'), true);
+  assert.equal(isAllowedOrigin('http://127.0.0.1:8788'), true);
+});
+
+test('isAllowedOrigin rejects other hosts and lookalikes', () => {
+  assert.equal(isAllowedOrigin('https://evil.com'), false);
+  assert.equal(isAllowedOrigin('https://tabshighscore.com.evil.com'), false);
+  assert.equal(isAllowedOrigin('https://eviltabshighscore.com'), false);
+});
+
+test('isAllowedOrigin rejects missing or malformed origins', () => {
+  assert.equal(isAllowedOrigin(null), false);
+  assert.equal(isAllowedOrigin(undefined), false);
+  assert.equal(isAllowedOrigin(''), false);
+  assert.equal(isAllowedOrigin('null'), false);
+  assert.equal(isAllowedOrigin('not a url'), false);
 });
